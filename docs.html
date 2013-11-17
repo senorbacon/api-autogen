@@ -1,0 +1,448 @@
+<html>
+<head>
+<style>
+div#tree_container {float: left; width: 200px; padding: 10px; overflow: auto; border-right: 1px solid black}
+div#node_info {float: left; margin-left: 10px; width: 800px}
+div#cmd_output {border: 1px solid black; background-color: #eee}
+span#action_desc {margin-left: 10px}
+span#api_call {border: 1px solid black; padding: 2px; color: black}
+span#api_call.disabled {color: #888; border: 1px solid #888}
+span.required {font-weight: bold}
+div.node {margin-left: 10px; display: none}
+table#params {margin-top: 10px}
+th, td {padding: 4px}
+div#submit {display: none}
+div#output {display: none}
+</style>
+</head>
+<body>
+
+<div id="tree_container">
+	<h3>Resource Tree</h3>
+	<p style='font-size: 90%'>(click a node to test)</p>
+	<div id="node_tree"></div>
+</div>
+<div id="node_info">
+	<h3>API Test Interface</h3>
+	Verb: <select id='action_select'></select>
+	Resource: <span id="api_call" type='text'></span>
+	<p><span id="action_desc"></span></p>
+	<table id="params"><tbody></tbody></table>
+	<div id="submit">
+		<input type='checkbox' id="disable_validation" value="1"> Disable param validation<br />
+		<button id="submit">Test Command</button>
+	</div>
+	<div id="output">
+	<h3>API Output</h3>
+	HTTP Status: <span id='http_status'></span><br />
+	Output:
+	<div id="cmd_output"></div>
+	</div>
+</div>
+
+<script src="js/jquery-1.7.2.js"></script>
+
+<script type="text/javascript">
+
+(function()
+{
+	$(document).ready(function()
+	{
+		$.getJSON('/6.0/v1/docs', function(data)
+		{
+			//$('#out').html(FormatJSON(data));
+
+			//debugger;
+			display_node_info(create_node_tree($('#node_tree'), data).data('node'));
+		});
+
+		$('#node_tree').click(node_tree_click);
+		$('#action_select').change(select_action);
+		$('#api_call').attr('disabled', 'disabled');
+		$('button#submit').click(submit_command);
+	});
+
+	function node_tree_click(e)
+	{
+		e.preventDefault();
+
+		var target = (e.target.nodeName == 'DIV') ? $(e.target) : $(e.target).parent();
+		display_node_info(target.data('node'));
+		target.children('div').toggle();
+	}
+
+	function display_node_info(node)
+	{
+		update_api_call(node);
+
+		update_node_actions(node);
+	}
+
+	function update_api_call(n)
+	{
+		var url_params = {}, node = n || $('#api_call').data('node'), p;
+
+		$('.url_param').each(function(i)
+		{
+			p = $(this).data('param');
+			url_params[p.name] = p;
+		});
+
+		$('#api_call').data('node', node).html(build_api_call(node, url_params, true));
+	}
+
+	function build_api_call(node, url_params, fill_in_empties)
+	{
+		var display, val;
+
+		if (node.param_definition)
+		{
+			if (url_params && url_params[node.param_definition.name] && (val = $('#param_' + node.param_definition.name).val()) != '')
+				display = val;
+			else
+				display = fill_in_empties ? node.token : '';
+
+			if (node.param_definition.type == 'path' && display.substr(-1) != '/')
+				display += '/';
+		}
+		else
+			display = node.token;
+
+		return (node.parent ? build_api_call(node.parent, url_params, fill_in_empties) : '') + '/' + display;
+	}
+
+	function update_node_actions(node)
+	{
+		var action_select = $('#action_select');
+
+		action_select.children('option').remove();
+
+		if (node.actions)
+		{
+			var selected = node.actions['GET'] ? 'GET' : null;
+			$.each(node.actions, function(verb, action)
+			{
+				if (!selected) selected = verb;
+
+				$('<option value="' + verb + '" ' + (selected == verb ? 'selected' : '') + '>' + verb + '</option>').appendTo(action_select);
+			});
+
+			action_select.removeAttr('disabled');
+			$('#api_call').removeClass('disabled');
+			select_action();
+		}
+		else
+		{
+			$('<option>N/A</option>').appendTo(action_select);
+			action_select.attr('disabled', 'disabled');
+			$('#api_call').addClass('disabled');
+
+			// hide params and submit button
+			$('#params').find('tr.param').remove();
+			$('div#submit').hide();
+			$('#output').hide();
+		}
+	}
+
+	function select_action()
+	{
+		var selected = $('#action_select').val() || 'N/A',
+			node = $('#api_call').data('node') || {},
+			action = node.actions[selected];
+
+		$('#params').find('tr.param').remove();
+
+		if (!action)
+			return;
+
+		$('#action_desc').html(action.description);
+
+		output_params(node, action);
+	}
+
+	function output_params(node, action)
+	{
+		var params = action.param_definitions || [];
+
+		var tbody = $('#params tbody'), req_class, name_span, input, default_val, options, desc, url_param, set_val = null, text_val, selected;
+
+		$.each(params, function(key, p)
+		{
+			req_class = p.required ? 'class="required"' : '';
+			name_span = '<span ' + req_class + '>' + p.name + '</span>';
+			default_val = (typeof p['default'] != 'undefined') ? p['default'] : null;
+			desc = p.description;
+			url_param = p.url_param ? ' url_param' : '';
+
+			if (browser_supports_sessionStorage())
+				set_val = sessionStorage.getItem('param_' + p.name);
+
+			if (p.type == 'friend' && !default_val)
+				default_val = '@username';
+
+			if (set_val === null)
+				set_val = default_val;
+
+			switch (p.type)
+			{
+				case 'string':
+				case 'friend':
+				case 'alphanum':
+				case 'integer':
+				case 'large_integer':
+				case 'email':
+				case 'email_list':
+				case 'friend_list':
+				case 'path':
+				case 'ip_address':
+				case 'mac_address':
+					text_val = (set_val === null) ? '' : 'value="' + set_val + '"';
+					input = '<input id="param_' + p.name + '" class="param_input' + url_param + '" type="text" ' + text_val + '></input>';
+					break;
+
+				case 'boolean':
+					input = '<select id="param_' + p.name + '" class="param_input' + url_param + '">';
+
+					selected = (set_val === null || set_val != 1) ? '' : ' selected';
+					input += '<option value="1" ' + selected + '>true</option>'
+
+					selected = (set_val === null || set_val != 0) ? '' : ' selected';
+					input += '<option value="0" ' + selected + '>false</option>'
+					input += '</select>';
+					break;
+
+				case 'enum':
+					desc += '<ul>';
+					options = '';
+					$.each(p.constraints, function(key, value)
+					{
+						selected = (set_val === null || set_val != key) ? '' : ' selected';
+						options += '<option value="' + key + '" ' + selected + '>' + key + '</option>';
+						desc += '<li>' + key + ': ' + value.description + '</li>';
+					});
+					input = '<select id="param_' + p.name + '" class="param_input' + url_param + '">' + options + '</select>';
+					desc += '</ul>';
+					break;
+
+				default:
+					alert('unknown type ' + p.type);
+			}
+
+			var row = $('<tr class="param"><td>' + name_span + '</td><td>' + input + '</td><td>' + desc + '</td></tr>').appendTo(tbody);
+			var form_element = row.find('.param_input');
+			form_element.data('param', p);
+
+			if (p.url_param)
+			{
+				form_element.change(function() { update_api_call() });
+				form_element.keypress(function() { setTimeout(function() { update_api_call() }, 0) });
+			}
+
+			form_element.change(store_param);
+			form_element.on('keypress', function(e) { setTimeout(function() { store_param(e) }, 0) }).on('keydown', function(e) { if (e.keyCode == 8) $(e.target).trigger('keypress'); });
+		});
+
+		update_api_call();
+
+		$('div#submit').show();
+	}
+
+	function store_param(e)
+	{
+		// store in session storage if available
+		if (browser_supports_sessionStorage())
+		{
+			var input = $(e.target), val = input.val(), p = input.data('param');
+
+			sessionStorage.setItem('param_' + p.name, val);
+		}
+	}
+
+	function submit_command()
+	{
+		var url, verb = $('#action_select').val(), params = {}, url_params = {}, missing = [];
+
+		if (verb != 'GET')
+		{
+			params['verb'] = verb;
+			verb = 'POST';
+		}
+
+		$('.param_input').each(function(i)
+		{
+			var input = $(this), val = input.val();
+			var p = input.data('param');
+
+			if (p.required && (typeof val == 'undefined' || val === null || val === ''))
+				missing.push(p.name);
+
+			if (input.hasClass('url_param'))
+				url_params[p.name] = val;
+			else
+				params[p.name] = val;
+		});
+
+		if (!$('#disable_validation:checked').val())
+		{
+			if (missing.length)
+			{
+				alert('Required param [' + missing[0] + '] needs a value');
+				return;
+			}
+		}
+
+		url = '/6.0' + build_api_call($('#api_call').data('node'), url_params, false);
+
+		$.ajax({ url: url, data: params, type: verb, complete: function(jqXHR, textStatus)
+		{
+			var json = $.parseJSON(jqXHR.responseText);
+			$('#output').show();
+			$('#http_status').html(jqXHR.status + " " + jqXHR.statusText);
+			$('#cmd_output').html('<pre>' + FormatJSON(json) + '</pre>');
+		}
+		});
+	}
+
+	function create_node_tree(parent, node)
+	{
+		var children = node.children || [];
+
+		if (node.node_id == "ROOT")
+			node.token = node.version;
+
+		if (node.token == '__param' || node.token == '__path_param')
+			node.token = "&lt;" + node.param_definition.name + "&gt;";
+
+		var node_html = $("<div class='node'><a href='#'>" + node.token + "</a></div>").appendTo(parent).data('node', node);
+
+		$.each(children, function(i, child)
+		{
+			var child_html = create_node_tree(node_html, child);
+
+			if (node.node_id == "ROOT")
+				child_html.show();
+
+			child_html.data('node').parent = node;
+		});
+
+		if (node.node_id == "ROOT")
+			node_html.show();
+
+		return node_html;
+	}
+
+	// IE7 makes this necessary, rather than just saying "if (sessionStorage)"
+	function browser_supports_sessionStorage()
+	{
+		try
+		{
+			return ('sessionStorage' in window) && window['sessionStorage'] && window.sessionStorage !== null;
+		} catch (e)
+		{
+			return false;
+		}
+	}
+
+	function RealTypeOf(v)
+	{
+		if (typeof (v) == "object")
+		{
+			if (v === null) return "null";
+			if (v.constructor == (new Array).constructor) return "array";
+			if (v.constructor == (new Date).constructor) return "date";
+			if (v.constructor == (new RegExp).constructor) return "regex";
+			return "object";
+		}
+		return typeof (v);
+	}
+
+	function FormatJSON(oData, sIndent)
+	{
+		if (arguments.length < 2)
+		{
+			var sIndent = "";
+		}
+		var sIndentStyle = "    ";
+		var sDataType = RealTypeOf(oData);
+
+		// open object
+		if (sDataType == "array")
+		{
+			if (oData.length == 0)
+			{
+				return "[]";
+			}
+			var sHTML = "[";
+		} else
+		{
+			var iCount = 0;
+			$.each(oData, function()
+			{
+				iCount++;
+				return;
+			});
+			if (iCount == 0)
+			{ // object is empty
+				return "{}";
+			}
+			var sHTML = "{";
+		}
+
+		// loop through items
+		var iCount = 0;
+		$.each(oData, function(sKey, vValue)
+		{
+			if (iCount > 0)
+			{
+				sHTML += ",";
+			}
+			if (sDataType == "array")
+			{
+				sHTML += ("\n" + sIndent + sIndentStyle);
+			} else
+			{
+				sHTML += ("\n" + sIndent + sIndentStyle + "\"" + sKey + "\"" + ": ");
+			}
+
+			// display relevant data type
+			switch (RealTypeOf(vValue))
+			{
+				case "array":
+				case "object":
+					sHTML += FormatJSON(vValue, (sIndent + sIndentStyle));
+					break;
+				case "boolean":
+				case "number":
+					sHTML += vValue.toString();
+					break;
+				case "null":
+					sHTML += "null";
+					break;
+				case "string":
+					sHTML += ("\"" + vValue + "\"");
+					break;
+				default:
+					sHTML += ("TYPEOF: " + typeof (vValue));
+			}
+
+			// loop
+			iCount++;
+		});
+
+		// close object
+		if (sDataType == "array")
+		{
+			sHTML += ("\n" + sIndent + "]");
+		} else
+		{
+			sHTML += ("\n" + sIndent + "}");
+		}
+
+		// return
+		return sHTML;
+	}
+})();
+	
+</script>
+</body>
+</html>
