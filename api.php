@@ -12,9 +12,9 @@
 
 ob_start();
 
-require_once "../server_config.php";
-require_once "../web_common/api_common.inc";
-require_once "../web_common/ra_config.inc";
+//require_once "../server_config.php";
+//require_once "../web_common/api_common.inc";
+//require_once "../web_common/ra_config.inc";
 require_once "api.inc";
 
 ob_end_clean();

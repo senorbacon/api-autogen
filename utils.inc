@@ -4,6 +4,16 @@
 // utils.inc - utility functions
 //
 
+function is_debug()
+{
+	return true;
+}
+
+function is_media_server()
+{
+	return true;
+}
+
 // json_encode converts unicode chars into their \u00xx representations. PHP 5.4.0 introduces JSON_UNESCAPED_UNICODE, this mimics that
 function ra_json_encode($obj)
 {

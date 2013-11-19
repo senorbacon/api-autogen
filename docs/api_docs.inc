@@ -63,7 +63,7 @@ class V1_API_Get_Docs extends API_Operation
 			$node_notes[] = "This node has been unchanged since version " . $n->version;
 			
 			foreach ($actions as $action)
-				$action->notes[] = "This operation has been unchanged since version " . $n->version;
+				$action['notes'][] = "This operation has been unchanged since version " . $n->version;
 		}
 	
 		$latest = API_Resource_Node::getLatestVersion($n->node_id);

@@ -48,7 +48,7 @@ div#output {display: none}
 {
 	$(document).ready(function()
 	{
-		$.getJSON('/6.0/v1/docs', function(data)
+		$.getJSON('/api-autogen/v1/docs', function(data)
 		{
 			//$('#out').html(FormatJSON(data));
 
@@ -291,7 +291,7 @@ div#output {display: none}
 			}
 		}
 
-		url = '/6.0' + build_api_call($('#api_call').data('node'), url_params, false);
+		url = '/api-autogen' + build_api_call($('#api_call').data('node'), url_params, false);
 
 		$.ajax({ url: url, data: params, type: verb, complete: function(jqXHR, textStatus)
 		{
