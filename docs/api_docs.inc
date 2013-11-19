@@ -74,7 +74,7 @@ class V1_API_Get_Docs extends API_Operation
 				$node_notes[] = "This node is deprecated. It has been removed in later versions.";
 
 				foreach ($actions as $action)
-					$action->notes[] = "This operation is deprecated. It has been removed in later versions.";
+					$action['notes'][] = "This operation is deprecated. It has been removed in later versions.";
 			}
 			else
 			{
@@ -83,9 +83,9 @@ class V1_API_Get_Docs extends API_Operation
 				foreach ($actions as $action)
 				{
 					if (!isset($latest->handlers[$action['verb']]))
-						$action->notes[] = "This operation is deprecated. It has been removed in later versions.";
+						$action['notes'][] = "This operation is deprecated. It has been removed in later versions.";
 					else if ($latest->handlers[$action['verb']] != $n->handlers[$action['verb']])
-						$action->notes[] = "This operation has been changed since version " . self::$version;
+						$action['notes'][] = "This operation has been changed since version " . self::$version;
 				}
 			}
 		}
