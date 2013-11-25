@@ -47,7 +47,8 @@
 									This prevents the hugely common problem of docs and tools getting out of sync with the API as it evolves.</p>
 
 							<p>Click on the nodes on the left hand side to get documentation and a unit test interface for that node. Each node has
-								different verbs like GET, DELETE, etc., and each of these verbs can be executed using the unit test harness.</p>
+								different verbs like GET, DELETE, etc., and each of these verbs can be executed using the unit test harness.
+								The example below is just a prototype... executing the verbs just outputs the parameters passed in.</p>
 
 							<p>When you select a particular verb, the interface displays all of the parameters that can or must be included with the 
 								request. There is also a checkbox that prevents the interface from rejecting invalid input, so that errored or harmful
@@ -55,16 +56,10 @@
 						</div>
 					</div>
 
-					<iframe style="border: 1px solid gray"
+					<iframe style="border: 1px solid gray; width:100%; height: 800px"
 					   src="docs.html" id="api-iframe">
 					   <p>iframes are not supported by your browser.</p>
 					</iframe>
-
-					<script content-type="text/javascript">
-						$(function() {
-							$('#api-iframe').css({width: screen.width * .9 + "px", height: "1000px"});
-						});
-					</script>
 
 					<footer>
 						<ul id="copyright">
